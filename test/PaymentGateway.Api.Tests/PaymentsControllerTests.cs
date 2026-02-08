@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 using PaymentGateway.Api.Controllers;
+using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Domain.Entities;
 using PaymentGateway.Domain.Enums;
@@ -15,11 +16,10 @@ namespace PaymentGateway.Api.Tests;
 public class PaymentsControllerTests
 {
     private readonly Random _random = new();
-    
+
     [Fact]
     public async Task RetrievesAPaymentSuccessfully()
     {
-        // Arrange
         var payment = new Payment
         {
             Id = Guid.NewGuid(),
@@ -40,11 +40,9 @@ public class PaymentsControllerTests
                 .AddSingleton<IPaymentRepository>(paymentsRepository)))
             .CreateClient();
 
-        // Act
         var response = await client.GetAsync($"/api/Payments/{payment.Id}");
         var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
         
-        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(paymentResponse);
     }
@@ -52,14 +50,169 @@ public class PaymentsControllerTests
     [Fact]
     public async Task Returns404IfPaymentNotFound()
     {
-        // Arrange
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
         
-        // Act
         var response = await client.GetAsync($"/api/Payments/{Guid.NewGuid()}");
         
-        // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostPayment_ValidRequest_Returns200OK()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(paymentResponse);
+    }
+
+    [Fact]
+    public async Task PostPayment_ValidRequest_ReturnsPaymentId()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+
+        Assert.NotNull(paymentResponse);
+        Assert.NotEqual(Guid.Empty, paymentResponse.Id);
+    }
+
+    [Fact]
+    public async Task PostPayment_ValidRequest_ReturnsLast4DigitsOnly()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+
+        Assert.NotNull(paymentResponse);
+        Assert.Equal(9012, paymentResponse.CardNumberLastFour);
+    }
+
+    [Fact]
+    public async Task PostPayment_ValidRequest_ReturnsCorrectData()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+
+        Assert.NotNull(paymentResponse);
+        Assert.Equal(request.ExpiryMonth, paymentResponse.ExpiryMonth);
+        Assert.Equal(request.ExpiryYear, paymentResponse.ExpiryYear);
+        Assert.Equal(request.Currency, paymentResponse.Currency);
+        Assert.Equal(request.Amount, paymentResponse.Amount);
+    }
+
+    [Fact]
+    public async Task PostPayment_InvalidCardNumber_Returns400BadRequest()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "123",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostPayment_InvalidExpiryDate_Returns400BadRequest()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 13,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostPayment_InvalidCurrency_Returns400BadRequest()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "XXX",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }
