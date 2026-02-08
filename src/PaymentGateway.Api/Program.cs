@@ -1,3 +1,4 @@
+using FluentValidation;
 using PaymentGateway.Domain.Interfaces;
 using PaymentGateway.Infrastructure.Repositories;
 
@@ -10,6 +11,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
+    typeof(PaymentGateway.Application.AssemblyReference).Assembly));
+
+builder.Services.AddValidatorsFromAssembly(
+    typeof(PaymentGateway.Application.AssemblyReference).Assembly);
+
+// Repository registration
 builder.Services.AddSingleton<IPaymentRepository, PaymentsRepository>();
 
 var app = builder.Build();
