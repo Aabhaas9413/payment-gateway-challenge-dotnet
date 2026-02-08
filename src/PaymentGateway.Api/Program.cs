@@ -1,4 +1,6 @@
 using FluentValidation;
+using PaymentGateway.Api.Middleware;
+using PaymentGateway.Application.Behaviors;
 using PaymentGateway.Domain.Interfaces;
 using PaymentGateway.Infrastructure.Repositories;
 
@@ -11,9 +13,18 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(
-    typeof(PaymentGateway.Application.AssemblyReference).Assembly));
+// Exception handling
+builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
+builder.Services.AddProblemDetails();
 
+// MediatR configuration - scan Application assembly for handlers
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(PaymentGateway.Application.AssemblyReference).Assembly);
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+
+// FluentValidation configuration - scan Application assembly for validators
 builder.Services.AddValidatorsFromAssembly(
     typeof(PaymentGateway.Application.AssemblyReference).Assembly);
 
@@ -23,6 +34,8 @@ builder.Services.AddSingleton<IPaymentRepository, PaymentsRepository>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

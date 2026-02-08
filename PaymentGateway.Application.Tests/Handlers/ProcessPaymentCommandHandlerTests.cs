@@ -113,8 +113,8 @@ public class ProcessPaymentCommandHandlerTests
         await _handler.Handle(command, CancellationToken.None);
 
         savedPayment.Should().NotBeNull();
-        savedPayment!.CardNumberLastFour.Should().NotBe(int.Parse(fullCardNumber));
-        savedPayment.CardNumberLastFour.ToString().Length.Should().Be(4);
+        savedPayment!.CardNumberLastFour.ToString().Length.Should().Be(4);
+        fullCardNumber.Should().EndWith(savedPayment.CardNumberLastFour.ToString());
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class ProcessPaymentCommandHandlerTests
         var result = await _handler.Handle(command, CancellationToken.None);
 
         result.CardNumberLastFour.ToString().Length.Should().Be(4);
-        result.CardNumberLastFour.Should().NotBe(int.Parse(fullCardNumber));
+        fullCardNumber.Should().EndWith(result.CardNumberLastFour.ToString());
     }
 
     [Fact]

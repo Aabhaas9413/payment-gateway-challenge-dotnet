@@ -28,7 +28,7 @@ public class ProcessPaymentCommandValidatorTests
         command.CardNumber = cardNumber!;
         var result = _validator.TestValidate(command);
         result.ShouldHaveValidationErrorFor(x => x.CardNumber)
-            .WithErrorMessage("*required*");
+            .WithErrorMessage("Card number is required");
     }
 
     [Theory]
