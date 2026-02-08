@@ -18,7 +18,6 @@ public class BankClient : IBankClient
 
     public async Task<BankPaymentResponse> ProcessPaymentAsync(BankPaymentRequest request, CancellationToken cancellationToken = default)
     {
-        // Map domain request to bank API format
         var bankRequest = new
         {
             card_number = request.CardNumber,
@@ -30,7 +29,6 @@ public class BankClient : IBankClient
 
         var response = await _httpClient.PostAsJsonAsync("/payments", bankRequest, cancellationToken);
 
-        // If bank returns error (400/503), throw exception
         response.EnsureSuccessStatusCode();
 
         var bankResponse = await response.Content.ReadFromJsonAsync<BankApiResponse>(cancellationToken);
@@ -52,10 +50,10 @@ public class BankClient : IBankClient
     /// </summary>
     private class BankApiResponse
     {
+        [System.Text.Json.Serialization.JsonPropertyName("authorized")]
         public bool Authorized { get; set; }
-        public string? Authorization_Code { get; set; }
 
-        // Map to PascalCase property
-        public string? AuthorizationCode => Authorization_Code;
+        [System.Text.Json.Serialization.JsonPropertyName("authorization_code")]
+        public string? AuthorizationCode { get; set; }
     }
 }
