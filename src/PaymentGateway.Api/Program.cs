@@ -31,6 +31,13 @@ builder.Services.AddValidatorsFromAssembly(
 // Repository registration
 builder.Services.AddSingleton<IPaymentRepository, PaymentsRepository>();
 
+// Bank Client registration with HttpClient
+builder.Services.AddHttpClient<IBankClient, PaymentGateway.Infrastructure.Clients.BankClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("BankSimulator:BaseUrl") ?? "http://localhost:8080");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

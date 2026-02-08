@@ -6,18 +6,30 @@ using PaymentGateway.Application.Tests.Helpers;
 using PaymentGateway.Domain.Entities;
 using PaymentGateway.Domain.Enums;
 using PaymentGateway.Domain.Interfaces;
+using PaymentGateway.Domain.Models;
 
 namespace PaymentGateway.Application.Tests.Handlers;
 
 public class ProcessPaymentCommandHandlerTests
 {
     private readonly Mock<IPaymentRepository> _mockRepository;
+    private readonly Mock<IBankClient> _mockBankClient;
     private readonly ProcessPaymentCommandHandler _handler;
 
     public ProcessPaymentCommandHandlerTests()
     {
         _mockRepository = new Mock<IPaymentRepository>();
-        _handler = new ProcessPaymentCommandHandler(_mockRepository.Object);
+        _mockBankClient = new Mock<IBankClient>();
+        _handler = new ProcessPaymentCommandHandler(_mockRepository.Object, _mockBankClient.Object);
+        
+        // Default bank response for all tests - returns authorized
+        SetupBankAuthorized();
+    }
+
+    private void SetupBankAuthorized(bool authorized = true)
+    {
+        _mockBankClient.Setup(x => x.ProcessPaymentAsync(It.IsAny<BankPaymentRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BankPaymentResponse { Authorized = authorized, AuthorizationCode = authorized ? "test-auth-code" : null });
     }
 
     [Fact]
