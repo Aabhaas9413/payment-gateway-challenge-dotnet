@@ -16,6 +16,13 @@ namespace PaymentGateway.Api.Tests;
 public class PaymentsControllerTests
 {
     private readonly Random _random = new();
+    
+    // Configure JSON options to match API settings (enums as strings)
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
 
     [Fact]
     public async Task RetrievesAPaymentSuccessfully()
@@ -41,7 +48,7 @@ public class PaymentsControllerTests
             .CreateClient();
 
         var response = await client.GetAsync($"/api/Payments/{payment.Id}");
-        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
         
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(paymentResponse);
@@ -75,7 +82,7 @@ public class PaymentsControllerTests
         };
 
         var response = await client.PostAsJsonAsync("/api/Payments", request);
-        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(paymentResponse);
@@ -98,7 +105,7 @@ public class PaymentsControllerTests
         };
 
         var response = await client.PostAsJsonAsync("/api/Payments", request);
-        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
 
         Assert.NotNull(paymentResponse);
         Assert.NotEqual(Guid.Empty, paymentResponse.Id);
@@ -121,7 +128,7 @@ public class PaymentsControllerTests
         };
 
         var response = await client.PostAsJsonAsync("/api/Payments", request);
-        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
 
         Assert.NotNull(paymentResponse);
         Assert.Equal(9012, paymentResponse.CardNumberLastFour);
@@ -144,7 +151,7 @@ public class PaymentsControllerTests
         };
 
         var response = await client.PostAsJsonAsync("/api/Payments", request);
-        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
 
         Assert.NotNull(paymentResponse);
         Assert.Equal(request.ExpiryMonth, paymentResponse.ExpiryMonth);
