@@ -20,17 +20,14 @@ public class ProcessPaymentCommandHandler : IRequestHandler<ProcessPaymentComman
 
     public async Task<ProcessPaymentResult> Handle(ProcessPaymentCommand request, CancellationToken cancellationToken)
     {
-        // Check for idempotency - if payment already exists, return it
         var existingPayment = _repository.Get(request.Id);
         if (existingPayment != null)
         {
             return MapToResult(existingPayment);
         }
 
-        // Format expiry date as MM/YYYY for bank (e.g., "04/2025")
         var expiryDate = $"{request.ExpiryMonth:D2}/{request.ExpiryYear}";
 
-        // Call bank to process payment
         var bankRequest = new BankPaymentRequest
         {
             CardNumber = request.CardNumber,
@@ -42,10 +39,8 @@ public class ProcessPaymentCommandHandler : IRequestHandler<ProcessPaymentComman
 
         var bankResponse = await _bankClient.ProcessPaymentAsync(bankRequest, cancellationToken);
 
-        // Extract last 4 digits for storage
         var lastFourDigits = int.Parse(request.CardNumber.Substring(request.CardNumber.Length - 4));
 
-        // Create payment entity with status from bank
         var payment = new Payment
         {
             Id = request.Id,
