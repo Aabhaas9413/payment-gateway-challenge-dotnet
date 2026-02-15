@@ -20,11 +20,18 @@ public class PaymentsController : Controller
     }
 
     [HttpPost]
-    public async Task<ActionResult<PostPaymentResponse>> ProcessPaymentAsync(PostPaymentRequest request)
+    public async Task<ActionResult<PostPaymentResponse>> ProcessPaymentAsync(
+        [FromHeader(Name = "Idempotency-Key")] Guid requestId,
+        [FromBody] PostPaymentRequest request)
     {
+        if (requestId == Guid.Empty)
+        {
+            return BadRequest("Idempotency-Key header is required.");
+        }
+
         var command = new ProcessPaymentCommand
         {
-            Id = Guid.NewGuid(),
+            Id = requestId,
             CardNumber = request.CardNumber,
             ExpiryMonth = request.ExpiryMonth,
             ExpiryYear = request.ExpiryYear,

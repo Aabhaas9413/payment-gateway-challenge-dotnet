@@ -70,6 +70,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -93,6 +94,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -116,6 +118,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -139,6 +142,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -165,6 +169,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -186,6 +191,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -207,6 +213,7 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
@@ -214,6 +221,28 @@ public class PaymentsControllerTests
             ExpiryMonth = 12,
             ExpiryYear = DateTime.Now.Year + 1,
             Currency = "XXX",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostPayment_MissingIdempotencyKey_Returns400BadRequest()
+    {
+        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        var client = webApplicationFactory.CreateClient();
+        // Header NOT added
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
             Amount = 10000,
             Cvv = "123"
         };
