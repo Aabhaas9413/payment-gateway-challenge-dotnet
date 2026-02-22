@@ -26,7 +26,7 @@ This API allows merchants to:
 **Security:**
 - Card numbers masked (only last 4 digits stored/returned)
 - CVV never persisted
-- Idempotent payment processing via Payment ID
+- Idempotent payment processing via Idempotency-Key
 
 ## Getting Started
 
