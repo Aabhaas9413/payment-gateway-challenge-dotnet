@@ -49,7 +49,9 @@ public class ProcessPaymentCommandHandler : IRequestHandler<ProcessPaymentComman
             ExpiryYear = request.ExpiryYear,
             Currency = request.Currency,
             Amount = request.Amount,
-            Status = bankResponse.Authorized ? PaymentStatus.Authorized : PaymentStatus.Declined
+            Status = bankResponse.BankUnavailable
+                ? PaymentStatus.Rejected
+                : bankResponse.Authorized ? PaymentStatus.Authorized : PaymentStatus.Declined
         };
 
         _repository.Add(payment);

@@ -29,6 +29,15 @@ public class BankClient : IBankClient
 
         var response = await _httpClient.PostAsJsonAsync("/payments", bankRequest, cancellationToken);
 
+        if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+        {
+            return new BankPaymentResponse
+            {
+                Authorized = false,
+                BankUnavailable = true
+            };
+        }
+
         response.EnsureSuccessStatusCode();
 
         var bankResponse = await response.Content.ReadFromJsonAsync<BankApiResponse>(cancellationToken);
