@@ -11,30 +11,61 @@ public class ValidationExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        if (exception is not ValidationException validationException)
+        // FluentValidation failure → 400
+        if (exception is ValidationException validationException)
         {
-            return false;
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Validation Error",
+                Detail = "One or more validation errors occurred."
+            };
+
+            var errors = validationException.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(e => e.ErrorMessage).ToArray()
+                );
+
+            problemDetails.Extensions["errors"] = errors;
+
+            httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+            return true;
         }
 
-        var problemDetails = new ProblemDetails
+        // Bank simulator unreachable (Docker not running, connection refused) → 503
+        if (exception is HttpRequestException)
         {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Validation Error",
-            Detail = "One or more validation errors occurred."
-        };
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Bank Unavailable",
+                Detail = "Could not reach the bank simulator. Ensure Docker is running."
+            };
 
-        var errors = validationException.Errors
-            .GroupBy(e => e.PropertyName)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Select(e => e.ErrorMessage).ToArray()
-            );
+            httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+            return true;
+        }
 
-        problemDetails.Extensions["errors"] = errors;
+        // Bank returned an unexpected/empty response → 502
+        if (exception is InvalidOperationException && exception.Message.Contains("Bank"))
+        {
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status502BadGateway,
+                Title = "Bad Gateway",
+                Detail = "The bank returned an unexpected response."
+            };
 
-        httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+            httpContext.Response.StatusCode = StatusCodes.Status502BadGateway;
+            await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+            return true;
+        }
 
-        return true;
+        // Anything else — let the default handler return 500
+        return false;
     }
 }

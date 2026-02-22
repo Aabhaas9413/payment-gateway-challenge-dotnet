@@ -2,6 +2,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 
 using PaymentGateway.Api.Controllers;
 using PaymentGateway.Api.Models.Requests;
@@ -9,6 +10,7 @@ using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Domain.Entities;
 using PaymentGateway.Domain.Enums;
 using PaymentGateway.Domain.Interfaces;
+using PaymentGateway.Domain.Models;
 using PaymentGateway.Infrastructure.Repositories;
 
 namespace PaymentGateway.Api.Tests;
@@ -16,13 +18,38 @@ namespace PaymentGateway.Api.Tests;
 public class PaymentsControllerTests
 {
     private readonly Random _random = new();
-    
-    // Configure JSON options to match API settings (enums as strings)
+
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
+
+    private static HttpClient CreateClientWithMockedBank(BankPaymentResponse bankResponse)
+    {
+        var mockBankClient = new Mock<IBankClient>();
+        mockBankClient
+            .Setup(x => x.ProcessPaymentAsync(
+                It.IsAny<BankPaymentRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bankResponse);
+
+        var factory = new WebApplicationFactory<PaymentsController>()
+            .WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services =>
+                {
+                    // Remove the real AddHttpClient<IBankClient, BankClient> registration
+                    var descriptor = services.SingleOrDefault(
+                        d => d.ServiceType == typeof(IBankClient));
+                    if (descriptor != null)
+                        services.Remove(descriptor);
+
+                    // Swap in the mock
+                    services.AddSingleton<IBankClient>(mockBankClient.Object);
+                }));
+
+        return factory.CreateClient();
+    }
 
     [Fact]
     public async Task RetrievesAPaymentSuccessfully()
@@ -49,7 +76,7 @@ public class PaymentsControllerTests
 
         var response = await client.GetAsync($"/api/Payments/{payment.Id}");
         var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
-        
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(paymentResponse);
     }
@@ -59,17 +86,17 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
-        
+
         var response = await client.GetAsync($"/api/Payments/{Guid.NewGuid()}");
-        
+
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
     public async Task PostPayment_ValidRequest_Returns200OK()
     {
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.CreateClient();
+        var client = CreateClientWithMockedBank(
+            new BankPaymentResponse { Authorized = true, AuthorizationCode = "AUTH123" });
         client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
@@ -92,8 +119,8 @@ public class PaymentsControllerTests
     [Fact]
     public async Task PostPayment_ValidRequest_ReturnsPaymentId()
     {
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.CreateClient();
+        var client = CreateClientWithMockedBank(
+            new BankPaymentResponse { Authorized = true, AuthorizationCode = "AUTH123" });
         client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
@@ -116,13 +143,13 @@ public class PaymentsControllerTests
     [Fact]
     public async Task PostPayment_ValidRequest_ReturnsLast4DigitsOnly()
     {
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.CreateClient();
+        var client = CreateClientWithMockedBank(
+            new BankPaymentResponse { Authorized = true, AuthorizationCode = "AUTH123" });
         client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
         {
-            CardNumber = "4532123456789012",
+            CardNumber = "4532123456789012",  
             ExpiryMonth = 12,
             ExpiryYear = DateTime.Now.Year + 1,
             Currency = "USD",
@@ -140,8 +167,8 @@ public class PaymentsControllerTests
     [Fact]
     public async Task PostPayment_ValidRequest_ReturnsCorrectData()
     {
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.CreateClient();
+        var client = CreateClientWithMockedBank(
+            new BankPaymentResponse { Authorized = true, AuthorizationCode = "AUTH123" });
         client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
         var request = new PostPaymentRequest
@@ -162,6 +189,56 @@ public class PaymentsControllerTests
         Assert.Equal(request.ExpiryYear, paymentResponse.ExpiryYear);
         Assert.Equal(request.Currency, paymentResponse.Currency);
         Assert.Equal(request.Amount, paymentResponse.Amount);
+    }
+
+    [Fact]
+    public async Task PostPayment_WhenBankDeclines_ReturnsDeclinedStatus()
+    {
+        var client = CreateClientWithMockedBank(
+            new BankPaymentResponse { Authorized = false, AuthorizationCode = null });
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789012",
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(paymentResponse);
+        Assert.Equal(PaymentStatus.Declined, paymentResponse.Status);
+    }
+
+    [Fact]
+    public async Task PostPayment_WhenBankUnavailable_ReturnsRejectedStatus()
+    {
+        var client = CreateClientWithMockedBank(
+            new BankPaymentResponse { Authorized = false, BankUnavailable = true });
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
+
+        var request = new PostPaymentRequest
+        {
+            CardNumber = "4532123456789010",  
+            ExpiryMonth = 12,
+            ExpiryYear = DateTime.Now.Year + 1,
+            Currency = "USD",
+            Amount = 10000,
+            Cvv = "123"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/Payments", request);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(paymentResponse);
+        Assert.Equal(PaymentStatus.Rejected, paymentResponse.Status);
     }
 
     [Fact]
@@ -235,7 +312,6 @@ public class PaymentsControllerTests
     {
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.CreateClient();
-        // Header NOT added
 
         var request = new PostPaymentRequest
         {
