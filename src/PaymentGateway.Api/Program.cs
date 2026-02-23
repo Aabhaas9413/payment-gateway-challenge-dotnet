@@ -6,37 +6,30 @@ using PaymentGateway.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Exception handling
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// MediatR configuration - scan Application assembly for handlers
 builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssembly(typeof(PaymentGateway.Application.AssemblyReference).Assembly);
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
 
-// FluentValidation configuration - scan Application assembly for validators
 builder.Services.AddValidatorsFromAssembly(
     typeof(PaymentGateway.Application.AssemblyReference).Assembly);
 
-// Repository registration
+
 builder.Services.AddSingleton<IPaymentRepository, PaymentsRepository>();
 
-// Bank Client registration with HttpClient
 builder.Services.AddHttpClient<IBankClient, PaymentGateway.Infrastructure.Clients.BankClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("BankSimulator:BaseUrl") ?? "http://localhost:8080");
@@ -45,7 +38,6 @@ builder.Services.AddHttpClient<IBankClient, PaymentGateway.Infrastructure.Client
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

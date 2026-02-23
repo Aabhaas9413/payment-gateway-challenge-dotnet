@@ -79,6 +79,7 @@ public class PaymentsControllerTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(paymentResponse);
+        Assert.Equal(payment.Currency, paymentResponse.Currency);
     }
 
     [Fact]
